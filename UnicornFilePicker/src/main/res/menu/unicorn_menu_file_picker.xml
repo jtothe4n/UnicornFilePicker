@@ -3,9 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_search"
-        android:title="@string/unicorn_search"
-        android:icon="@drawable/unicorn_ic_search"
-        app:showAsAction="always"
-        app:actionViewClass="androidx.appcompat.widget.SearchView"/>
+        android:title=""
+        android:id="@+id/action_unselect"
+        android:icon="@drawable/unicorn_unselect"
+        app:showAsAction="always"/>
+    <item
+        android:title=""
+        android:id="@+id/action_select"
+        android:icon="@drawable/unicorn_select"
+        app:showAsAction="always"/>
+    <item
+        android:title=""
+        android:id="@+id/action_sort"
+        android:icon="@drawable/action_sort"
+        app:showAsAction="always">
+
+    </item>
+
 </menu>

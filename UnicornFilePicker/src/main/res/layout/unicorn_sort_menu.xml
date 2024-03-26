@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:padding="5dp"
+    android:layout_height="match_parent">
+
+    <RadioGroup
+        android:id="@+id/sort_group"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <RadioButton
+            android:id="@+id/sort_alphabetically"
+            android:text="@string/unicorn_action_sort_alphabetically"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <RadioButton
+            android:id="@+id/sort_by_date"
+            android:text="@string/unicorn_action_sort_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <RadioButton
+            android:id="@+id/sort_by_exif"
+            android:text="@string/unicorn_action_sort_exif_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+    </RadioGroup>
+
+    <View
+        android:background="@color/cardview_dark_background"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"/>
+
+    <CheckBox
+        android:id="@+id/sort_ascending"
+        android:layout_gravity="right"
+        android:layout_marginTop="5dp"
+        android:text="@string/unicorn_action_Descending"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>

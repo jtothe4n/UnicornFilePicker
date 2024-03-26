@@ -41,6 +41,11 @@ import abhishekti7.unicorn.filepicker.utils.UnicornSimpleItemDecoration;
 public class FilePickerActivity extends AppCompatActivity {
 
     private static final String TAG = "FilePickerActivity";
+    public static final String PREF_SORT_BY = "sort_by";
+    public static final String PREF_SORT_DESC = "sort_desc";
+    public static final Integer SORT_ALPHABETICALLY = 0;
+    public static final Integer SORT_DATE = 1;
+    public static final Integer SORT_EXIF = 2;
     private UnicornActivityFilePickerBinding filePickerBinding;
 
     private File root_dir;
@@ -219,7 +224,7 @@ public class FilePickerActivity extends AppCompatActivity {
                 }
 
             }
-            Collections.sort(arr_files, new CustomFileComparator());
+            Collections.sort(arr_files, new CustomFileComparator(FilePickerActivity.this));
 
             arr_dir_stack.add(model);
             filePickerBinding.rvDirPath.scrollToPosition(arr_dir_stack.size() - 1);
@@ -237,6 +242,14 @@ public class FilePickerActivity extends AppCompatActivity {
 
     // Custom Comparator to sort the list of files in lexicographical order
     public static class CustomFileComparator implements Comparator<DirectoryModel> {
+
+        Context mContext;
+        boolean mDescending;
+        public CustomFileComparator(Context context) {
+            mContext = context;
+            mDescending = Utils.getSharedPreferences(mContext).getBoolean(PREF_SORT_DESC, false);
+        }
+
         @Override
         public int compare(DirectoryModel o1, DirectoryModel o2) {
             if (o1.isDirectory() && o2.isDirectory()) {
@@ -246,8 +259,66 @@ public class FilePickerActivity extends AppCompatActivity {
             } else if (!o1.isDirectory() && o2.isDirectory()) {
                 return 1;
             } else {
-                return o1.getName().toLowerCase().compareTo(o2.getName().toLowerCase());
+
+                int sort_by = Utils.getSharedPreferences(mContext).getInt(PREF_SORT_BY, SORT_ALPHABETICALLY);
+
+                if(sort_by == SORT_DATE)
+                {
+                    File file1 = new File(o1.getPath());
+                    File file2 = new File(o2.getPath());
+                    return mDescending ? Long.compare(file2.lastModified(), file1.lastModified()) :   Long.compare(file1.lastModified(), file2.lastModified());
+                }
+                else if(sort_by == SORT_EXIF)
+                {
+                    File file1 = new File(o1.getPath());
+                    File file2 = new File(o2.getPath());
+
+                    try {
+                        ExifInterface exifInterface1 = new ExifInterface(file1);
+                        ExifInterface exifInterface2 = new ExifInterface(file2);
+
+                        String dateAttr1 = exifInterface1.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL);
+
+                        if (TextUtils.isEmpty(dateAttr1))
+                            dateAttr1 = exifInterface1.getAttribute(ExifInterface.TAG_DATETIME_DIGITIZED);
+
+                        if (TextUtils.isEmpty(dateAttr1))
+                            dateAttr1 = exifInterface1.getAttribute(ExifInterface.TAG_DATETIME);
+
+
+                        String dateAttr2 = exifInterface2.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL);
+
+                        if (TextUtils.isEmpty(dateAttr2))
+                            dateAttr2 = exifInterface2.getAttribute(ExifInterface.TAG_DATETIME_DIGITIZED);
+
+                        if (TextUtils.isEmpty(dateAttr2))
+                            dateAttr2 = exifInterface2.getAttribute(ExifInterface.TAG_DATETIME);
+
+
+                        if(!TextUtils.isEmpty(dateAttr1) && !TextUtils.isEmpty(dateAttr2))
+                        {
+                            Date date1 = Utils.getDateFromExifAttribute(dateAttr1);
+                            Date date2 = Utils.getDateFromExifAttribute(dateAttr2);
+                            return  mDescending ? Long.compare(date2.getTime(),date1.getTime()) : Long.compare(date1.getTime(),date2.getTime());
+                        }
+                        else if(!TextUtils.isEmpty(dateAttr1) && TextUtils.isEmpty(dateAttr2))
+                        {
+                          return mDescending ? 1 : -1;
+                        }
+                        else if(TextUtils.isEmpty(dateAttr1) && !TextUtils.isEmpty(dateAttr2))
+                        {
+                            return mDescending ? -1 :1;
+                        }
+
+                    } catch (Exception e) {
+                    }
+
+
+                }
+
             }
+
+             return mDescending ? NaturalOrderComparator.s_compare(o2.getName(),o1.getName()) :  NaturalOrderComparator.s_compare(o1.getName(),o2.getName());
         }
     }
 
@@ -257,24 +328,122 @@ public class FilePickerActivity extends AppCompatActivity {
         MenuInflater menuInflater = getMenuInflater();
         menuInflater.inflate(R.menu.unicorn_menu_file_picker, menu);
 
-        MenuItem item_search = menu.findItem(R.id.action_search);
-
-        SearchView searchView = (SearchView) item_search.getActionView();
-        searchView.setImeOptions(EditorInfo.IME_ACTION_DONE);
-
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+        MenuItem menuSort = menu.findItem(R.id.action_sort);
+        MenuItem menuSelect = menu.findItem(R.id.action_select);
+        MenuItem menuDeSelect = menu.findItem(R.id.action_unselect);
+        menuSort.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
-            public boolean onQueryTextSubmit(String query) {
-                return false;
+            public boolean onMenuItemClick(@NonNull MenuItem menuItem) {
+
+                showSortMenu();
+                return true;
             }
+        });
 
+        menuSelect.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
-            public boolean onQueryTextChange(String newText) {
-                directoryAdapter.getFilter().filter(newText);
-                return false;
+            public boolean onMenuItemClick(@NonNull MenuItem menuItem) {
+                directoryAdapter.selectAll();
+                directoryAdapter.notifyDataSetChanged();
+                return true;
+            }
+        });
+
+        menuDeSelect.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(@NonNull MenuItem menuItem) {
+                directoryAdapter.resetSelection();
+                directoryAdapter.notifyDataSetChanged();
+                return true;
             }
         });
         return true;
+    }
+	
+	 private void showSortMenu() {
+
+        View sortLayout = getLayoutInflater().inflate(R.layout.unicorn_sort_menu, null);
+
+        RadioGroup radioGroup = sortLayout.findViewById(R.id.sort_group);
+
+        CheckBox checkBoxAsc = sortLayout.findViewById(R.id.sort_ascending);
+
+        int sort_by = Utils.getSharedPreferences(this).getInt(PREF_SORT_BY, SORT_ALPHABETICALLY);
+        boolean descending = Utils.getSharedPreferences(this).getBoolean(PREF_SORT_DESC, false);
+
+        int checkId = R.id.sort_alphabetically;
+
+        if (sort_by == SORT_DATE)
+            checkId = R.id.sort_by_date;
+        else if (sort_by == SORT_EXIF)
+            checkId = R.id.sort_by_exif;
+
+        radioGroup.check(checkId);
+        checkBoxAsc.setChecked(descending);;
+        radioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                RadioButton checkedRadioButton = (RadioButton) group.findViewById(checkedId);
+                boolean isChecked = checkedRadioButton.isChecked();
+
+                int sort_by = SORT_ALPHABETICALLY;
+
+                if (isChecked) {
+                    if (checkedId == R.id.sort_alphabetically) {
+                        sort_by = SORT_ALPHABETICALLY;
+                    } else if (checkedId == R.id.sort_by_date) {
+                        sort_by = SORT_DATE;
+                    } else if (checkedId == R.id.sort_by_exif) {
+                        sort_by = SORT_EXIF;
+                    }
+                    Utils.getSharedPreferences(FilePickerActivity.this).edit().putInt(PREF_SORT_BY, sort_by).apply();
+                }
+            }
+        });
+        checkBoxAsc.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean checked) {
+                Utils.getSharedPreferences(FilePickerActivity.this).edit().putBoolean(PREF_SORT_DESC, checked).apply();
+            }
+        });
+
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+        builder.setCancelable(false);
+        builder.setView(sortLayout);
+        builder.setTitle(R.string.unicorn_sort_by);
+        builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+
+     
+                selected_files.clear();
+
+                Handler handler = new Handler(Looper.getMainLooper(), new Handler.Callback() {
+                    @Override
+                    public boolean handleMessage(@NonNull Message message) {
+
+                
+                        stackAdapter.notifyDataSetChanged();
+                        directoryAdapter.notifyDataSetChanged();
+                        return true;
+                    }
+                });
+
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Collections.sort(visible_files, new CustomFileComparator(FilePickerActivity.this));
+
+                        handler.sendEmptyMessage(0);
+                    }
+                }).start();
+
+            }
+        });
+
+        builder.show();
+
     }
 
     /**
